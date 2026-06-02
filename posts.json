@@ -1,0 +1,26 @@
+[
+  {
+    "id": 3,
+    "username": "Slender",
+    "content": "12",
+    "timestamp": "2026-05-19T18:00:22.660911",
+    "likes": 23,
+    "dislikes": 2
+  },
+  {
+    "id": 1,
+    "username": "Usuário Exemplo",
+    "content": "Este é um post de exemplo no meu feed de rede social!",
+    "timestamp": "2026-05-19T15:35:36",
+    "likes": 15,
+    "dislikes": 4
+  },
+  {
+    "id": 2,
+    "username": "Outro Usuário",
+    "content": "Adoro este novo recurso! #socialmedia #update",
+    "timestamp": "2026-05-18T10:00:00",
+    "likes": 25,
+    "dislikes": 7
+  }
+]
