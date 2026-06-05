@@ -26,19 +26,21 @@ if not posts:
     posts = [
         {
             'id': 1,
-            'username': 'Usuário Exemplo',
-            'content': 'Este é um post de exemplo no meu feed de rede social!',
-            'timestamp': '2026-05-19T15:35:36',
-            'likes': 12,
-            'dislikes': 3
+            'username': 'Maria Silva',
+            'content': 'Acabei de lançar meu novo projeto! Estou muito animada para compartilhar isso com vocês. 🎉',
+            'timestamp': '2026-06-05T09:00:00',
+            'likes': 124,
+            'comments': 18,
+            'shares': 5
         },
         {
             'id': 2,
-            'username': 'Outro Usuário',
-            'content': 'Adoro este novo recurso! #socialmedia #update',
-            'timestamp': '2026-05-18T10:00:00',
-            'likes': 25,
-            'dislikes': 7
+            'username': 'João Santos',
+            'content': 'Bom dia! Começando a semana com energia positiva. ☀️',
+            'timestamp': '2026-06-05T06:00:00',
+            'likes': 43,
+            'comments': 7,
+            'shares': 2
         }
     ]
     save_posts(posts)
@@ -81,11 +83,49 @@ def create_post():
         'content': data.get('content', ''),
         'timestamp': datetime.now().isoformat(),
         'likes': 0,
-        'dislikes': 0
+        'comments': 0,
+        'shares': 0,
+        'is_share': data.get('is_share', False),
+        'original_author': data.get('original_author', None)
     }
     posts.insert(0, new_post)  # Adiciona no início
     save_posts(posts)
     return jsonify(new_post), 201
+
+@app.route('/api/posts/<int:post_id>/share', methods=['POST'])
+def share_post(post_id):
+    """Compartilha um post existente"""
+    # Encontrar o post original
+    original_post = None
+    for post in posts:
+        if post['id'] == post_id:
+            original_post = post
+            break
+    
+    if not original_post:
+        return jsonify({'error': 'Post não encontrado'}), 404
+    
+    # Incrementar contador de compartilhamentos do post original
+    original_post['shares'] = original_post.get('shares', 0) + 1
+    save_posts(posts)
+    
+    # Criar novo post como compartilhamento
+    data = request.json
+    shared_post = {
+        'id': len(posts) + 1,
+        'username': data.get('username', 'Leitor Conectado'),
+        'content': original_post['content'],
+        'timestamp': datetime.now().isoformat(),
+        'likes': 0,
+        'comments': 0,
+        'shares': 0,
+        'is_share': True,
+        'original_author': original_post['username'],
+        'original_post_id': original_post['id']
+    }
+    posts.insert(0, shared_post)
+    save_posts(posts)
+    return jsonify(shared_post), 201
 
 @app.route('/api/posts/<int:post_id>/like', methods=['POST'])
 def like_post(post_id):
@@ -97,14 +137,15 @@ def like_post(post_id):
             return jsonify({'likes': post['likes']})
     return jsonify({'error': 'Post não encontrado'}), 404
 
-@app.route('/api/posts/<int:post_id>/dislike', methods=['POST'])
-def dislike_post(post_id):
-    """Adiciona um dislike ao post"""
+@app.route('/api/posts/<int:post_id>/comment', methods=['POST'])
+def add_comment(post_id):
+    """Adiciona um comentário ao post"""
+    data = request.json
     for post in posts:
         if post['id'] == post_id:
-            post['dislikes'] += 1
+            post['comments'] = post.get('comments', 0) + 1
             save_posts(posts)
-            return jsonify({'dislikes': post['dislikes']})
+            return jsonify({'comments': post['comments']})
     return jsonify({'error': 'Post não encontrado'}), 404
 
 @app.route('/api/posts/<int:post_id>', methods=['DELETE'])
@@ -208,6 +249,11 @@ HTML_TEMPLATE = '''
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
+        .feed h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
         .post {
             border-bottom: 1px solid #eee;
             padding: 20px 0;
@@ -222,6 +268,19 @@ HTML_TEMPLATE = '''
             background: #f9f9f9;
             padding-left: 10px;
             padding-right: 10px;
+        }
+
+        .share-indicator {
+            background: #f0f2f5;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            color: #65676b;
+        }
+
+        .share-indicator i {
+            margin-right: 5px;
         }
 
         .post-header {
@@ -251,8 +310,9 @@ HTML_TEMPLATE = '''
 
         .post-actions {
             display: flex;
-            gap: 15px;
+            gap: 20px;
             align-items: center;
+            margin-top: 10px;
         }
 
         .action-btn {
@@ -265,41 +325,29 @@ HTML_TEMPLATE = '''
             transition: all 0.2s;
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 8px;
+            color: #65676b;
         }
 
-        .like-btn {
-            color: #4caf50;
+        .action-btn:hover {
+            background: #f0f2f5;
         }
 
         .like-btn:hover {
-            background: #e8f5e9;
-            transform: scale(1.05);
+            color: #4caf50;
         }
 
-        .dislike-btn {
-            color: #f44336;
+        .comment-btn:hover {
+            color: #2196f3;
         }
 
-        .dislike-btn:hover {
-            background: #ffebee;
-            transform: scale(1.05);
-        }
-
-        .delete-btn {
-            color: #999;
-            margin-left: auto;
-        }
-
-        .delete-btn:hover {
-            background: #ffebee;
-            color: #f44336;
+        .share-btn:hover {
+            color: #9c27b0;
         }
 
         .stats {
-            display: flex;
-            gap: 5px;
-            font-size: 12px;
+            font-size: 13px;
+            color: #65676b;
         }
 
         .empty-feed {
@@ -322,6 +370,61 @@ HTML_TEMPLATE = '''
         .post {
             animation: fadeIn 0.3s ease-out;
         }
+
+        .share-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .share-modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .share-modal-content h3 {
+            margin-bottom: 20px;
+        }
+
+        .share-modal-content input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-buttons button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .modal-buttons button:first-child {
+            background: #ddd;
+        }
+
+        .modal-buttons button:last-child {
+            background: #667eea;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -337,12 +440,26 @@ HTML_TEMPLATE = '''
         </div>
 
         <div class="feed">
-            <h2>Feed de Notícias</h2>
+            <h2>Feed</h2>
             <div id="posts-container"></div>
         </div>
     </div>
 
+    <!-- Modal de Compartilhamento -->
+    <div id="shareModal" class="share-modal">
+        <div class="share-modal-content">
+            <h3>Compartilhar Post</h3>
+            <input type="text" id="shareUsername" placeholder="Seu nome (opcional)">
+            <div class="modal-buttons">
+                <button onclick="closeShareModal()">Cancelar</button>
+                <button onclick="confirmShare()">Compartilhar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        let currentSharePostId = null;
+
         async function loadPosts() {
             try {
                 const response = await fetch('/api/posts');
@@ -380,26 +497,41 @@ HTML_TEMPLATE = '''
                 return;
             }
 
-            container.innerHTML = posts.map(post => `
-                <div class="post" id="post-${post.id}">
-                    <div class="post-header">
-                        <span class="username">${escapeHtml(post.username)}</span>
-                        <span class="timestamp">${formatTimestamp(post.timestamp)}</span>
+            container.innerHTML = posts.map(post => {
+                let shareHtml = '';
+                if (post.is_share) {
+                    shareHtml = `
+                        <div class="share-indicator">
+                            🔄 ${escapeHtml(post.username)} compartilhou de ${escapeHtml(post.original_author)}
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="post" id="post-${post.id}">
+                        ${shareHtml}
+                        <div class="post-header">
+                            <span class="username">${post.is_share ? '' : escapeHtml(post.username)}</span>
+                            <span class="timestamp">${formatTimestamp(post.timestamp)}</span>
+                        </div>
+                        <div class="post-content">${escapeHtml(post.content)}</div>
+                        <div class="stats">
+                            ❤️ ${post.likes}   💬 ${post.comments}   🔄 ${post.shares || 0}
+                        </div>
+                        <div class="post-actions">
+                            <button class="action-btn like-btn" onclick="handleLike(${post.id})">
+                                👍 Curtir
+                            </button>
+                            <button class="action-btn comment-btn" onclick="handleComment(${post.id})">
+                                💬 Comentar
+                            </button>
+                            <button class="action-btn share-btn" onclick="openShareModal(${post.id})">
+                                🔄 Compartilhar
+                            </button>
+                        </div>
                     </div>
-                    <div class="post-content">${escapeHtml(post.content)}</div>
-                    <div class="post-actions">
-                        <button class="action-btn like-btn" onclick="handleLike(${post.id})">
-                            👍 <span id="likes-${post.id}">${post.likes}</span>
-                        </button>
-                        <button class="action-btn dislike-btn" onclick="handleDislike(${post.id})">
-                            👎 <span id="dislikes-${post.id}">${post.dislikes}</span>
-                        </button>
-                        <button class="action-btn delete-btn" onclick="deletePost(${post.id})">
-                            🗑️ Deletar
-                        </button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         function escapeHtml(text) {
@@ -425,7 +557,8 @@ HTML_TEMPLATE = '''
                     },
                     body: JSON.stringify({
                         username: username || 'Anônimo',
-                        content: content
+                        content: content,
+                        is_share: false
                     })
                 });
 
@@ -440,47 +573,85 @@ HTML_TEMPLATE = '''
             }
         }
 
+        function openShareModal(postId) {
+            currentSharePostId = postId;
+            document.getElementById('shareModal').style.display = 'flex';
+            document.getElementById('shareUsername').value = '';
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').style.display = 'none';
+            currentSharePostId = null;
+        }
+
+        async function confirmShare() {
+            if (!currentSharePostId) return;
+            
+            const username = document.getElementById('shareUsername').value.trim();
+            
+            try {
+                const response = await fetch(`/api/posts/${currentSharePostId}/share`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username || 'Leitor Conectado'
+                    })
+                });
+
+                if (response.ok) {
+                    alert('Post compartilhado com sucesso!');
+                    closeShareModal();
+                    loadPosts();
+                } else {
+                    alert('Erro ao compartilhar. Tente novamente.');
+                }
+            } catch (error) {
+                console.error('Erro ao compartilhar:', error);
+                alert('Erro ao compartilhar. Tente novamente.');
+            }
+        }
+
         async function handleLike(postId) {
             try {
                 const response = await fetch(`/api/posts/${postId}/like`, {
                     method: 'POST'
                 });
-                const data = await response.json();
                 if (response.ok) {
-                    document.getElementById(`likes-${postId}`).textContent = data.likes;
+                    loadPosts();
                 }
             } catch (error) {
                 console.error('Erro ao dar like:', error);
             }
         }
 
-        async function handleDislike(postId) {
-            try {
-                const response = await fetch(`/api/posts/${postId}/dislike`, {
-                    method: 'POST'
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    document.getElementById(`dislikes-${postId}`).textContent = data.dislikes;
-                }
-            } catch (error) {
-                console.error('Erro ao dar dislike:', error);
-            }
-        }
-
-        async function deletePost(postId) {
-            if (confirm('Tem certeza que deseja deletar este post?')) {
+        async function handleComment(postId) {
+            const comment = prompt('Digite seu comentário:');
+            if (comment && comment.trim()) {
                 try {
-                    const response = await fetch(`/api/posts/${postId}`, {
-                        method: 'DELETE'
+                    const response = await fetch(`/api/posts/${postId}/comment`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ comment: comment })
                     });
                     if (response.ok) {
+                        alert('Comentário adicionado!');
                         loadPosts();
                     }
                 } catch (error) {
-                    console.error('Erro ao deletar post:', error);
-                    alert('Erro ao deletar. Tente novamente.');
+                    console.error('Erro ao comentar:', error);
                 }
+            }
+        }
+
+        // Fechar modal ao clicar fora
+        window.onclick = function(event) {
+            const modal = document.getElementById('shareModal');
+            if (event.target === modal) {
+                closeShareModal();
             }
         }
 
