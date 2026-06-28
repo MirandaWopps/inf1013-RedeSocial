@@ -1,12 +1,15 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, session, redirect, url_for
 from datetime import datetime
 import json
 import os
 
 app = Flask(__name__)
+app.secret_key = 'temporary_data_key'
 
-# Arquivo para persistência dos dados
+# Arquivos para persistência dos dados
 DATA_FILE = 'posts.json'
+USERS_FILE = 'users.json'
+FRIEND_REQUESTS_FILE = 'friend_requests.json'
 
 # Estrutura de dados para posts
 def load_posts():
@@ -19,8 +22,33 @@ def save_posts(posts):
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(posts, f, ensure_ascii=False, indent=2)
 
-# Inicializar posts
+# Estrutura de dados para usuários
+def load_users():
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return []
+
+def save_users(users):
+    with open(USERS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
+
+# Estrutura de dados para envio de pedidos de amizade
+def load_friend_requests():
+    if os.path.exists(FRIEND_REQUESTS_FILE):
+        with open(FRIEND_REQUESTS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return []
+
+def save_friend_requests(friend_requests):
+    with open(FRIEND_REQUESTS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(friend_requests, f, ensure_ascii=False, indent=2)
+
+# Inicializar dados
 posts = load_posts()
+users = load_users()
+friend_requests = load_friend_requests()
+
 if not posts:
     # Posts de exemplo
     posts = [
@@ -79,7 +107,7 @@ def create_post():
     data = request.json
     new_post = {
         'id': len(posts) + 1,
-        'username': data.get('username', 'Anônimo'),
+        'username': session['username'],
         'content': data.get('content', ''),
         'timestamp': datetime.now().isoformat(),
         'likes': 0,
@@ -129,12 +157,30 @@ def share_post(post_id):
 
 @app.route('/api/posts/<int:post_id>/like', methods=['POST'])
 def like_post(post_id):
-    """Adiciona um like ao post"""
+    """Alterna curtida do usuário logado no post"""
+    if 'username' not in session:
+        return jsonify({'error': 'Usuário não logado'}), 401
+
+    current_user = session['username']
+
     for post in posts:
         if post['id'] == post_id:
-            post['likes'] += 1
+            if 'liked_by' not in post:
+                post['liked_by'] = []
+
+            if current_user in post['liked_by']:
+                post['liked_by'].remove(current_user)
+            else:
+                post['liked_by'].append(current_user)
+
+            post['likes'] = len(post['liked_by'])
             save_posts(posts)
-            return jsonify({'likes': post['likes']})
+
+            return jsonify({
+                'likes': post['likes'],
+                'liked_by_current_user': current_user in post['liked_by']
+            })
+
     return jsonify({'error': 'Post não encontrado'}), 404
 
 @app.route('/api/posts/<int:post_id>/comment', methods=['POST'])
@@ -156,12 +202,266 @@ def delete_post(post_id):
     save_posts(posts)
     return jsonify({'message': 'Post deletado com sucesso'}), 200
 
+# Rotas de Login e Logout
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+
+        for user in users:
+            if user['username'] == username and user['password'] == password:
+                session['username'] = username
+                return redirect(url_for('index'))
+
+        return render_template_string(LOGIN_TEMPLATE, error='Usuário ou senha inválidos.')
+
+    return render_template_string(LOGIN_TEMPLATE, error=None)
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('login'))
+
+# Rota de listar usuários
+@app.route('/api/users', methods=['GET'])
+def get_users():
+    if 'username' not in session:
+        return jsonify({'error': 'Usuário não logado'}), 401
+
+    current_user = session['username']
+
+    visible_users = []
+    for user in users:
+        if user['username'] != current_user:
+            visible_users.append({
+                'username': user['username'],
+                'friends': current_user in user.get('friends', [])
+            })
+
+    return jsonify(visible_users)
+
+# Rota de envio de convite de amizade
+@app.route('/api/friend-request/<target_username>', methods=['POST'])
+def send_friend_request(target_username):
+    if 'username' not in session:
+        return jsonify({'error': 'Usuário não logado'}), 401
+
+    current_user = session['username']
+
+    if current_user == target_username:
+        return jsonify({'error': 'Você não pode enviar solicitação para si mesmo'}), 400
+
+    target_user = None
+    for user in users:
+        if user['username'] == target_username:
+            target_user = user
+            break
+
+    if not target_user:
+        return jsonify({'error': 'Usuário não encontrado'}), 404
+
+    current_user_data = None
+    for user in users:
+        if user['username'] == current_user:
+            current_user_data = user
+            break
+
+    if target_username in current_user_data.get('friends', []):
+        return jsonify({'error': 'Vocês já são amigos'}), 400
+
+    for req in friend_requests:
+        if (
+            req['from'] == current_user
+            and req['to'] == target_username
+            and req['status'] == 'pending'
+        ):
+            return jsonify({'error': 'Solicitação já enviada'}), 400
+
+    new_request = {
+        'from': current_user,
+        'to': target_username,
+        'status': 'pending',
+        'timestamp': datetime.now().isoformat()
+    }
+
+    friend_requests.append(new_request)
+    save_friend_requests(friend_requests)
+
+    return jsonify({'message': 'Solicitação enviada com sucesso'})
+
+# Rotas de listar e responder solicitações de amizade
+@app.route('/api/friend-requests', methods=['GET'])
+def get_friend_requests():
+    if 'username' not in session:
+        return jsonify({'error': 'Usuário não logado'}), 401
+
+    current_user = session['username']
+
+    received_requests = [
+        req for req in friend_requests
+        if req['to'] == current_user and req['status'] == 'pending'
+    ]
+
+    return jsonify(received_requests)
+
+@app.route('/api/friend-request/respond', methods=['POST'])
+def respond_friend_request():
+    if 'username' not in session:
+        return jsonify({'error': 'Usuário não logado'}), 401
+
+    current_user = session['username']
+    data = request.json
+
+    from_user = data.get('from')
+    action = data.get('action')
+
+    if action not in ['accept', 'reject']:
+        return jsonify({'error': 'Ação inválida'}), 400
+
+    for req in friend_requests:
+        if req['from'] == from_user and req['to'] == current_user and req['status'] == 'pending':
+            if action == 'accept':
+                req['status'] = 'accepted'
+
+                for user in users:
+                    if user['username'] == current_user:
+                        if from_user not in user['friends']:
+                            user['friends'].append(from_user)
+
+                    if user['username'] == from_user:
+                        if current_user not in user['friends']:
+                            user['friends'].append(current_user)
+
+                save_users(users)
+
+            else:
+                req['status'] = 'rejected'
+
+            save_friend_requests(friend_requests)
+
+            return jsonify({'message': 'Solicitação respondida com sucesso'})
+
+    return jsonify({'error': 'Solicitação não encontrada'}), 404
+
+# Rota para listar amigos
+@app.route('/api/friends', methods=['GET'])
+def get_friends():
+    if 'username' not in session:
+        return jsonify({'error': 'Usuário não logado'}), 401
+
+    current_user = session['username']
+
+    for user in users:
+        if user['username'] == current_user:
+            return jsonify(user.get('friends', []))
+
+    return jsonify([])
+
 # Rota principal - interface web
 @app.route('/')
 def index():
-    return render_template_string(HTML_TEMPLATE)
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    return render_template_string(
+        HTML_TEMPLATE,
+        current_user=session['username']
+    )
 
-# Template HTML/CSS/JS
+# Templates HTML/CSS/JS
+LOGIN_TEMPLATE = '''
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - Rede Social</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+        }
+
+        .login-box {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            width: 320px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+            text-align: center;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .error {
+            color: #f44336;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .hint {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h1>📱 Login</h1>
+
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST">
+            <input type="text" name="username" placeholder="Usuário" required>
+            <input type="password" name="password" placeholder="Senha" required>
+            <button type="submit">Entrar</button>
+        </form>
+
+        <div class="hint">
+            Teste: pedro / 123<br>
+            lucas / 123<br>
+            maria / 123<br>
+            joao / 123
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+
+
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -195,11 +495,86 @@ HTML_TEMPLATE = '''
             margin-bottom: 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
+        
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
         h1 {
             color: #333;
             margin-bottom: 20px;
             font-size: 2em;
+        }
+        
+        .user-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 25px;
+            font-size: 18px;
+            color: #333;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .current-user {
+            font-size: 26px;
+            font-weight: 800;
+            color: #764ba2;
+            letter-spacing: 0.5px;
+        }
+        
+        .user-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .user-item:last-child {
+            border-bottom: none;
+        }
+
+        .user-name {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .friend-status {
+            font-size: 16px;
+            font-weight: bold;
+            color: #667eea;
+            padding: 12px 24px;
+            display: inline-block;
+        }
+
+        .logout-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 12px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+
+        .logout-btn:hover {
+            transform: translateY(-2px);
+            text-decoration: none;
         }
 
         .create-post {
@@ -226,7 +601,8 @@ HTML_TEMPLATE = '''
             resize: vertical;
         }
 
-        .create-post button {
+        .primary-btn {
+            display: inline-block;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
@@ -236,10 +612,13 @@ HTML_TEMPLATE = '''
             font-size: 16px;
             font-weight: bold;
             transition: transform 0.2s;
+            text-decoration: none;
+            text-align: center;
         }
 
-        .create-post button:hover {
+        .primary-btn:hover {
             transform: translateY(-2px);
+            text-decoration: none;
         }
 
         .feed {
@@ -430,13 +809,28 @@ HTML_TEMPLATE = '''
 <body>
     <div class="container">
         <div class="header">
-            <h1>📱 Rede Social</h1>
-        </div>
+            <div class="header-top">
+                <h1>📱 Rede Social</h1>
 
+                <button class="primary-btn" onclick="openFriendsModal()">Amigos</button>
+            </div>
+
+            <div class="user-bar">
+                <div class="user-info">
+                    <span>Logado como:</span>
+                    <strong class="current-user">{{ current_user }}</strong>
+                </div>
+
+                <div class="user-actions">
+                    <button class="primary-btn" onclick="openUsersModal()">Adicionar amigos</button>
+                    <button class="primary-btn" onclick="openRequestsModal()">Solicitações</button>
+                    <a class="primary-btn" href="/logout">Sair</a>
+                </div>
+            </div>
+        </div>
         <div class="create-post">
-            <input type="text" id="username" placeholder="Seu nome" maxlength="50">
             <textarea id="content" placeholder="O que você está pensando?"></textarea>
-            <button onclick="createPost()">Publicar</button>
+            <button class="primary-btn" onclick="createPost()">Publicar</button>
         </div>
 
         <div class="feed">
@@ -445,6 +839,28 @@ HTML_TEMPLATE = '''
         </div>
     </div>
 
+    <!-- Modal de Solicitações de Amizade -->
+    <div id="requestsModal" class="share-modal">
+        <div class="share-modal-content">
+            <h3>Solicitações recebidas</h3>
+            <div id="requests-container"></div>
+            <div class="modal-buttons">
+                <button onclick="closeRequestsModal()">Fechar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Amigos -->
+    <div id="friendsModal" class="share-modal">
+        <div class="share-modal-content">
+            <h3>Meus amigos</h3>
+            <div id="friends-container"></div>
+            <div class="modal-buttons">
+                <button onclick="closeFriendsModal()">Fechar</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- Modal de Compartilhamento -->
     <div id="shareModal" class="share-modal">
         <div class="share-modal-content">
@@ -456,10 +872,129 @@ HTML_TEMPLATE = '''
             </div>
         </div>
     </div>
+    
+    <!-- Modal de Usuário -->
+    <div id="usersModal" class="share-modal">
+        <div class="share-modal-content">
+            <h3>Adicionar amigos</h3>
+            <div id="users-container"></div>
+            <div class="modal-buttons">
+                <button onclick="closeUsersModal()">Fechar</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         let currentSharePostId = null;
 
+        function openRequestsModal() {
+            document.getElementById('requestsModal').style.display = 'flex';
+            loadFriendRequests();
+        }
+
+        // Funções de solicitação de amizade
+        function closeRequestsModal() {
+            document.getElementById('requestsModal').style.display = 'none';
+        }
+
+        async function loadFriendRequests() {
+            try {
+                const response = await fetch('/api/friend-requests');
+                const requests = await response.json();
+                displayFriendRequests(requests);
+            } catch (error) {
+                console.error('Erro ao carregar solicitações:', error);
+            }
+        }
+
+        function displayFriendRequests(requests) {
+            const container = document.getElementById('requests-container');
+
+            if (requests.length === 0) {
+                container.innerHTML = '<div class="empty-feed">Nenhuma solicitação pendente.</div>';
+                return;
+            }
+
+            container.innerHTML = requests.map(req => `
+                <div class="user-item">
+                    <span class="user-name">${escapeHtml(req.from)}</span>
+                    <div class="user-actions">
+                        <button class="primary-btn" onclick="respondFriendRequest('${escapeHtml(req.from)}', 'accept')">
+                            Aceitar
+                        </button>
+                        <button class="primary-btn" onclick="respondFriendRequest('${escapeHtml(req.from)}', 'reject')">
+                            Recusar
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function respondFriendRequest(fromUser, action) {
+            try {
+                const response = await fetch('/api/friend-request/respond', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        from: fromUser,
+                        action: action
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert(data.message);
+                    loadFriendRequests();
+                    loadUsers();
+                } else {
+                    alert(data.error || 'Erro ao responder solicitação.');
+                }
+            } catch (error) {
+                console.error('Erro ao responder solicitação:', error);
+            }
+        }
+        
+        // Funções de listar amigos
+        function openFriendsModal() {
+            document.getElementById('friendsModal').style.display = 'flex';
+            loadFriends();
+        }
+
+        function closeFriendsModal() {
+            document.getElementById('friendsModal').style.display = 'none';
+        }
+
+        async function loadFriends() {
+            try {
+                const response = await fetch('/api/friends');
+                const friends = await response.json();
+                displayFriends(friends);
+            } catch (error) {
+                console.error('Erro ao carregar amigos:', error);
+            }
+        }
+
+        function displayFriends(friends) {
+            const container = document.getElementById('friends-container');
+
+            if (friends.length === 0) {
+                container.innerHTML = '<div class="empty-feed">Você ainda não tem amigos adicionados.</div>';
+                return;
+            }
+
+            container.innerHTML = friends.map(friend => `
+                <div class="user-item">
+                    <span class="user-name">${escapeHtml(friend)}</span>
+                </div>
+            `).join('');
+        }
+        
+        
+        
+        
         async function loadPosts() {
             try {
                 const response = await fetch('/api/posts');
@@ -541,7 +1076,6 @@ HTML_TEMPLATE = '''
         }
 
         async function createPost() {
-            const username = document.getElementById('username').value.trim();
             const content = document.getElementById('content').value.trim();
 
             if (!content) {
@@ -556,14 +1090,12 @@ HTML_TEMPLATE = '''
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        username: username || 'Anônimo',
                         content: content,
                         is_share: false
                     })
                 });
 
                 if (response.ok) {
-                    document.getElementById('username').value = '';
                     document.getElementById('content').value = '';
                     loadPosts();
                 }
@@ -582,6 +1114,15 @@ HTML_TEMPLATE = '''
         function closeShareModal() {
             document.getElementById('shareModal').style.display = 'none';
             currentSharePostId = null;
+        }
+        
+        function openUsersModal() {
+            document.getElementById('usersModal').style.display = 'flex';
+            loadUsers();
+        }
+
+        function closeUsersModal() {
+            document.getElementById('usersModal').style.display = 'none';
         }
 
         async function confirmShare() {
@@ -649,14 +1190,82 @@ HTML_TEMPLATE = '''
 
         // Fechar modal ao clicar fora
         window.onclick = function(event) {
-            const modal = document.getElementById('shareModal');
-            if (event.target === modal) {
+            const shareModal = document.getElementById('shareModal');
+            const usersModal = document.getElementById('usersModal');
+            const requestsModal = document.getElementById('requestsModal');
+            const friendsModal = document.getElementById('friendsModal');
+            
+            if (event.target === shareModal) {
                 closeShareModal();
+            }
+
+            if (event.target === usersModal) {
+                closeUsersModal();
+            }
+            
+            if (event.target === requestsModal) {
+                closeRequestsModal();
+            }
+            
+            if (event.target === friendsModal) {
+                closeFriendsModal();
+            }
+        }
+        
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/users');
+                const users = await response.json();
+                displayUsers(users);
+            } catch (error) {
+                console.error('Erro ao carregar usuários:', error);
+            }
+        }
+
+        function displayUsers(users) {
+            const container = document.getElementById('users-container');
+
+            if (users.length === 0) {
+                container.innerHTML = '<div class="empty-feed">Nenhum outro usuário encontrado.</div>';
+                return;
+            }
+
+            container.innerHTML = users.map(user => `
+                <div class="user-item">
+                    <span class="user-name">${escapeHtml(user.username)}</span>
+                    ${
+                        user.friends
+                        ? `<span class="friend-status">Vocês já são amigos</span>`
+                        : `<button class="primary-btn" onclick="sendFriendRequest('${escapeHtml(user.username)}')">
+                            Enviar Solicitação
+                        </button>`
+                    }
+                </div>
+            `).join('');
+        }
+
+        async function sendFriendRequest(username) {
+            try {
+                const response = await fetch(`/api/friend-request/${username}`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('Solicitação enviada com sucesso!');
+                } else {
+                    alert(data.error || 'Erro ao enviar solicitação.');
+                }
+            } catch (error) {
+                console.error('Erro ao enviar solicitação:', error);
+                alert('Erro ao enviar solicitação.');
             }
         }
 
         // Carregar posts ao iniciar
         loadPosts();
+        loadUsers();
 
         // Atualizar feed a cada 30 segundos
         setInterval(loadPosts, 30000);

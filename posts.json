@@ -1,10 +1,122 @@
 [
   {
+    "id": 14,
+    "username": "pedro",
+    "content": "testando depois de mudanças",
+    "timestamp": "2026-06-27T19:19:16.508982",
+    "likes": 0,
+    "comments": 0,
+    "shares": 0,
+    "is_share": false,
+    "original_author": null,
+    "liked_by": []
+  },
+  {
+    "id": 13,
+    "username": "pedro",
+    "content": "novo post sem curtidas",
+    "timestamp": "2026-06-27T19:14:18.653650",
+    "likes": 1,
+    "comments": 0,
+    "shares": 0,
+    "is_share": false,
+    "original_author": null,
+    "liked_by": [
+      "pedro"
+    ]
+  },
+  {
+    "id": 12,
+    "username": "maria",
+    "content": "testando maria mais uma vez",
+    "timestamp": "2026-06-27T18:57:48.104476",
+    "likes": 0,
+    "liked_by": [],
+    "comments": 0,
+    "shares": 0,
+    "is_share": false,
+    "original_author": null
+  },
+  {
+    "id": 11,
+    "username": "maria",
+    "content": "testando maria",
+    "timestamp": "2026-06-27T18:57:39.833776",
+    "likes": 0,
+    "liked_by": [],
+    "comments": 0,
+    "shares": 0,
+    "is_share": false,
+    "original_author": null
+  },
+  {
+    "id": 10,
+    "username": "pedro",
+    "content": "teste depois de gravar username",
+    "timestamp": "2026-06-27T18:53:36.726513",
+    "likes": 2,
+    "liked_by": [],
+    "comments": 0,
+    "shares": 0,
+    "is_share": false,
+    "original_author": null
+  },
+  {
+    "id": 9,
+    "username": "pedrooo",
+    "content": "teste com nome",
+    "timestamp": "2026-06-27T18:43:17.272904",
+    "likes": 0,
+    "liked_by": [],
+    "comments": 0,
+    "shares": 0,
+    "is_share": false,
+    "original_author": null
+  },
+  {
+    "id": 8,
+    "username": "Anônimo",
+    "content": "teste",
+    "timestamp": "2026-06-27T18:43:07.415220",
+    "likes": 0,
+    "liked_by": [],
+    "comments": 0,
+    "shares": 0,
+    "is_share": false,
+    "original_author": null
+  },
+  {
+    "id": 7,
+    "username": "Pedro Serpa",
+    "content": "Testando post",
+    "timestamp": "2026-06-07T17:30:49.678024",
+    "likes": 6,
+    "liked_by": [],
+    "comments": 0,
+    "shares": 0,
+    "is_share": false,
+    "original_author": null
+  },
+  {
+    "id": 6,
+    "username": "Pedro",
+    "content": "12",
+    "timestamp": "2026-06-07T17:30:25.307704",
+    "likes": 1,
+    "liked_by": [],
+    "comments": 0,
+    "shares": 0,
+    "is_share": true,
+    "original_author": "Slender",
+    "original_post_id": 3
+  },
+  {
     "id": 5,
     "username": "lima",
     "content": "asdasd",
     "timestamp": "2026-06-05T14:39:25.694556",
     "likes": 0,
+    "liked_by": [],
     "comments": 0,
     "shares": 0,
     "is_share": true,
@@ -17,6 +129,7 @@
     "content": "asdasd",
     "timestamp": "2026-06-05T13:37:54.459118",
     "likes": 1,
+    "liked_by": [],
     "dislikes": 0,
     "shares": 1
   },
@@ -25,8 +138,11 @@
     "username": "Slender",
     "content": "12",
     "timestamp": "2026-05-19T18:00:22.660911",
-    "likes": 23,
-    "dislikes": 2
+    "likes": 28,
+    "liked_by": [],
+    "dislikes": 2,
+    "comments": 1,
+    "shares": 1
   },
   {
     "id": 1,
@@ -34,6 +150,7 @@
     "content": "Este é um post de exemplo no meu feed de rede social!",
     "timestamp": "2026-05-19T15:35:36",
     "likes": 15,
+    "liked_by": [],
     "dislikes": 4
   },
   {
@@ -42,6 +159,7 @@
     "content": "Adoro este novo recurso! #socialmedia #update",
     "timestamp": "2026-05-18T10:00:00",
     "likes": 25,
+    "liked_by": [],
     "dislikes": 7
   }
 ]

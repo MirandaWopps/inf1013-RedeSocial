@@ -1,0 +1,14 @@
+[
+  {
+    "from": "pedro",
+    "to": "joao",
+    "status": "pending",
+    "timestamp": "2026-06-27T19:30:03.793211"
+  },
+  {
+    "from": "pedro",
+    "to": "lucas",
+    "status": "accepted",
+    "timestamp": "2026-06-27T19:43:25.800114"
+  }
+]

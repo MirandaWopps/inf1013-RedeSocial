@@ -1,0 +1,26 @@
+[
+  {
+    "username": "pedro",
+    "password": "123",
+    "friends": [
+      "lucas"
+    ]
+  },
+  {
+    "username": "joao",
+    "password": "123",
+    "friends": []
+  },
+  {
+    "username": "maria",
+    "password": "123",
+    "friends": []
+  },
+  {
+    "username": "lucas",
+    "password": "123",
+    "friends": [
+      "pedro"
+    ]
+  }
+]
