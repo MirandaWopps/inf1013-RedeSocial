@@ -10,5 +10,11 @@
     "to": "lucas",
     "status": "accepted",
     "timestamp": "2026-06-27T19:43:25.800114"
+  },
+  {
+    "from": "pedro",
+    "to": "maria",
+    "status": "accepted",
+    "timestamp": "2026-06-30T15:30:10.724007"
   }
 ]

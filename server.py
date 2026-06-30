@@ -98,8 +98,22 @@ def format_time_ago(timestamp):
 # Rotas da API
 @app.route('/api/posts', methods=['GET'])
 def get_posts():
-    """Retorna todos os posts"""
-    return jsonify(posts)
+    """Retorna posts visíveis para o usuário logado"""
+    if 'username' not in session:
+        return jsonify({'error': 'Usuário não logado'}), 401
+
+    current_user = session['username']
+
+    visible_posts = []
+
+    for post in posts:
+        if not post.get('is_share'):
+            visible_posts.append(post)
+        else:
+            if current_user in post.get('shared_to', []):
+                visible_posts.append(post)
+
+    return jsonify(visible_posts)
 
 @app.route('/api/posts', methods=['POST'])
 def create_post():
@@ -122,37 +136,61 @@ def create_post():
 
 @app.route('/api/posts/<int:post_id>/share', methods=['POST'])
 def share_post(post_id):
-    """Compartilha um post existente"""
-    # Encontrar o post original
+    """Compartilha um post com amigos selecionados"""
+    if 'username' not in session:
+        return jsonify({'error': 'Usuário não logado'}), 401
+
+    current_user = session['username']
+    data = request.json
+    selected_friends = data.get('selected_friends', [])
+
+    if not selected_friends:
+        return jsonify({'error': 'Selecione pelo menos um amigo para compartilhar'}), 400
+
+    current_user_data = None
+    for user in users:
+        if user['username'] == current_user:
+            current_user_data = user
+            break
+
+    if not current_user_data:
+        return jsonify({'error': 'Usuário não encontrado'}), 404
+
+    current_user_friends = current_user_data.get('friends', [])
+
+    for friend in selected_friends:
+        if friend not in current_user_friends:
+            return jsonify({'error': f'{friend} não é seu amigo'}), 400
+
     original_post = None
     for post in posts:
         if post['id'] == post_id:
             original_post = post
             break
-    
+
     if not original_post:
         return jsonify({'error': 'Post não encontrado'}), 404
-    
-    # Incrementar contador de compartilhamentos do post original
+
     original_post['shares'] = original_post.get('shares', 0) + 1
-    save_posts(posts)
-    
-    # Criar novo post como compartilhamento
-    data = request.json
+
     shared_post = {
         'id': len(posts) + 1,
-        'username': data.get('username', 'Leitor Conectado'),
+        'username': current_user,
         'content': original_post['content'],
         'timestamp': datetime.now().isoformat(),
         'likes': 0,
+        'liked_by': [],
         'comments': 0,
         'shares': 0,
         'is_share': True,
         'original_author': original_post['username'],
-        'original_post_id': original_post['id']
+        'original_post_id': original_post['id'],
+        'shared_to': selected_friends
     }
+
     posts.insert(0, shared_post)
     save_posts(posts)
+
     return jsonify(shared_post), 201
 
 @app.route('/api/posts/<int:post_id>/like', methods=['POST'])
@@ -783,6 +821,30 @@ HTML_TEMPLATE = '''
             border-radius: 6px;
         }
 
+        .modal-description {
+            color: #555;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .share-friend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .share-friend-item:last-child {
+            border-bottom: none;
+        }
+
+        .share-friend-item label {
+            cursor: pointer;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
         .modal-buttons {
             display: flex;
             gap: 10px;
@@ -865,7 +927,10 @@ HTML_TEMPLATE = '''
     <div id="shareModal" class="share-modal">
         <div class="share-modal-content">
             <h3>Compartilhar Post</h3>
-            <input type="text" id="shareUsername" placeholder="Seu nome (opcional)">
+            <p class="modal-description">Selecione os amigos que receberão este compartilhamento:</p>
+
+            <div id="share-friends-container"></div>
+
             <div class="modal-buttons">
                 <button onclick="closeShareModal()">Cancelar</button>
                 <button onclick="confirmShare()">Compartilhar</button>
@@ -1105,10 +1170,35 @@ HTML_TEMPLATE = '''
             }
         }
 
-        function openShareModal(postId) {
+        async function openShareModal(postId) {
             currentSharePostId = postId;
             document.getElementById('shareModal').style.display = 'flex';
-            document.getElementById('shareUsername').value = '';
+
+            await loadFriendsForShare();
+        }
+        
+        async function loadFriendsForShare() {
+            const container = document.getElementById('share-friends-container');
+
+            try {
+                const response = await fetch('/api/friends');
+                const friends = await response.json();
+
+                if (friends.length === 0) {
+                    container.innerHTML = '<div class="empty-feed">Você ainda não possui amigos para compartilhar posts.</div>';
+                    return;
+                }
+
+                container.innerHTML = friends.map(friend => `
+                    <div class="share-friend-item">
+                        <input type="checkbox" class="share-friend-checkbox" value="${escapeHtml(friend)}" id="share-${escapeHtml(friend)}">
+                        <label for="share-${escapeHtml(friend)}">${escapeHtml(friend)}</label>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Erro ao carregar amigos para compartilhamento:', error);
+                container.innerHTML = '<div class="empty-feed">Erro ao carregar amigos.</div>';
+            }
         }
 
         function closeShareModal() {
@@ -1127,9 +1217,16 @@ HTML_TEMPLATE = '''
 
         async function confirmShare() {
             if (!currentSharePostId) return;
-            
-            const username = document.getElementById('shareUsername').value.trim();
-            
+
+            const selectedFriends = Array.from(
+                document.querySelectorAll('.share-friend-checkbox:checked')
+            ).map(checkbox => checkbox.value);
+
+            if (selectedFriends.length === 0) {
+                alert('Selecione pelo menos um amigo para compartilhar.');
+                return;
+            }
+
             try {
                 const response = await fetch(`/api/posts/${currentSharePostId}/share`, {
                     method: 'POST',
@@ -1137,16 +1234,18 @@ HTML_TEMPLATE = '''
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        username: username || 'Leitor Conectado'
+                        selected_friends: selectedFriends
                     })
                 });
+
+                const data = await response.json();
 
                 if (response.ok) {
                     alert('Post compartilhado com sucesso!');
                     closeShareModal();
                     loadPosts();
                 } else {
-                    alert('Erro ao compartilhar. Tente novamente.');
+                    alert(data.error || 'Erro ao compartilhar. Tente novamente.');
                 }
             } catch (error) {
                 console.error('Erro ao compartilhar:', error);

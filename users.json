@@ -3,7 +3,8 @@
     "username": "pedro",
     "password": "123",
     "friends": [
-      "lucas"
+      "lucas",
+      "maria"
     ]
   },
   {
@@ -14,7 +15,9 @@
   {
     "username": "maria",
     "password": "123",
-    "friends": []
+    "friends": [
+      "pedro"
+    ]
   },
   {
     "username": "lucas",
