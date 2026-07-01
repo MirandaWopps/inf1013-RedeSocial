@@ -4,26 +4,33 @@
     "password": "123",
     "friends": [
       "lucas",
-      "maria"
+      "maria",
+      "joao"
     ]
   },
   {
     "username": "joao",
     "password": "123",
-    "friends": []
+    "friends": [
+      "pedro",
+      "maria",
+      "lucas"
+    ]
   },
   {
     "username": "maria",
     "password": "123",
     "friends": [
-      "pedro"
+      "pedro",
+      "joao"
     ]
   },
   {
     "username": "lucas",
     "password": "123",
     "friends": [
-      "pedro"
+      "pedro",
+      "joao"
     ]
   }
 ]

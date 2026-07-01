@@ -1,5 +1,55 @@
 [
   {
+    "id": 29,
+    "username": "maria",
+    "content": "post aparece em tempo real?",
+    "timestamp": "2026-06-30T18:38:34.747437",
+    "likes": 0,
+    "comments": 0,
+    "shares": 0,
+    "is_share": false,
+    "original_author": null
+  },
+  {
+    "id": 28,
+    "username": "pedro",
+    "content": "quero compartilhar isso com certos amigos",
+    "timestamp": "2026-06-30T18:22:49.203979",
+    "likes": 0,
+    "liked_by": [],
+    "comments": 0,
+    "shares": 0,
+    "is_share": true,
+    "original_author": "pedro",
+    "original_post_id": 27,
+    "shared_to": [
+      "lucas",
+      "maria"
+    ]
+  },
+  {
+    "id": 27,
+    "username": "pedro",
+    "content": "quero compartilhar isso com certos amigos",
+    "timestamp": "2026-06-30T18:22:18.852961",
+    "likes": 0,
+    "comments": 0,
+    "shares": 1,
+    "is_share": false,
+    "original_author": null
+  },
+  {
+    "id": 26,
+    "username": "pedro",
+    "content": "post mais recente (feito por pedro)",
+    "timestamp": "2026-06-30T18:10:22.353254",
+    "likes": 0,
+    "comments": 0,
+    "shares": 0,
+    "is_share": false,
+    "original_author": null
+  },
+  {
     "id": 25,
     "username": "pedro",
     "content": "eu sou a maria e estou fazendo esse post para ver se o pedro consegue compartilhar ele para mim e para o lucas ao mesmo tempo.",
@@ -21,11 +71,14 @@
     "username": "maria",
     "content": "eu sou a maria e estou fazendo esse post para ver se o pedro consegue compartilhar ele para mim e para o lucas ao mesmo tempo.",
     "timestamp": "2026-06-30T15:44:40.857721",
-    "likes": 0,
+    "likes": 1,
     "comments": 0,
     "shares": 1,
     "is_share": false,
-    "original_author": null
+    "original_author": null,
+    "liked_by": [
+      "pedro"
+    ]
   },
   {
     "id": 23,

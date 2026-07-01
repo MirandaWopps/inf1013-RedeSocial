@@ -2,7 +2,7 @@
   {
     "from": "pedro",
     "to": "joao",
-    "status": "pending",
+    "status": "accepted",
     "timestamp": "2026-06-27T19:30:03.793211"
   },
   {
@@ -16,5 +16,17 @@
     "to": "maria",
     "status": "accepted",
     "timestamp": "2026-06-30T15:30:10.724007"
+  },
+  {
+    "from": "joao",
+    "to": "maria",
+    "status": "accepted",
+    "timestamp": "2026-06-30T18:12:52.430573"
+  },
+  {
+    "from": "joao",
+    "to": "lucas",
+    "status": "accepted",
+    "timestamp": "2026-06-30T18:27:21.502035"
   }
 ]
